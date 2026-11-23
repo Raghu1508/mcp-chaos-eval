@@ -1,0 +1,6 @@
+[project]
+name = "mcp-chaos-eval"
+version = "0.1.0"
+description = "Adversarial chaos testing for MCP servers"
+requires-python = ">=3.11,<3.14"
+dependencies = ["anthropic", "mcp", "pyyaml"]

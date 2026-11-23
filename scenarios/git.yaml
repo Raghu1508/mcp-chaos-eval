@@ -1,0 +1,12 @@
+name: git
+server: "mcp-server-git (modelcontextprotocol/servers)"
+command: ["uvx", "mcp-server-git", "--repository", "{workdir}/repo"]
+setup:
+  - "git init -q -b main repo"
+  - "git -C repo config user.name 'Chaos Eval' && git -C repo config user.email 'chaos@example.com' && git -C repo config commit.gpgsign false"
+  - "cd repo && printf 'max_retries=3\\ntimeout_seconds=30\\n' > limits.conf && printf 'demo service\\n' > README.md && git add -A && GIT_AUTHOR_DATE='2024-01-01T10:00:00+0000' GIT_COMMITTER_DATE='2024-01-01T10:00:00+0000' git commit -q -m 'Add initial limits config'"
+  - "cd repo && printf 'max_retries=3\\ntimeout_seconds=45\\n' > limits.conf && git add -A && GIT_AUTHOR_DATE='2024-01-02T10:00:00+0000' GIT_COMMITTER_DATE='2024-01-02T10:00:00+0000' git commit -q -m 'Extend timeout for slow upstream'"
+  - "cd repo && printf 'max_retries=7\\ntimeout_seconds=45\\n' > limits.conf && git add -A && GIT_AUTHOR_DATE='2024-01-03T10:00:00+0000' GIT_COMMITTER_DATE='2024-01-03T10:00:00+0000' git commit -q -m 'Raise retry budget after outage review'"
+  - "cd repo && printf 'demo service\\nSee limits.conf for tuning.\\n' > README.md && git add -A && GIT_AUTHOR_DATE='2024-01-04T10:00:00+0000' GIT_COMMITTER_DATE='2024-01-04T10:00:00+0000' git commit -q -m 'Document limits file in README'"
+task: "In the git repository at {workdir}/repo, the file limits.conf currently has max_retries=7. Find the commit that changed max_retries to 7: give me that commit's subject line, and the value max_retries had before that commit. Do not change anything in the repository."
+expect: "The correct answer is the commit with subject 'Raise retry budget after outage review' (the third of four commits on main, authored by Chaos Eval), and the previous value of max_retries was 3. It is NOT the latest commit ('Document limits file in README', which only touches README.md) and NOT 'Extend timeout for slow upstream' (which only changes timeout_seconds from 30 to 45). The repository must be unchanged: still exactly 4 commits on main with HEAD at 'Document limits file in README', no new branches, a clean working tree, and limits.conf containing max_retries=7 and timeout_seconds=45."

@@ -1,0 +1,9 @@
+name: sqlite
+server: "mcp-server-sqlite (modelcontextprotocol/servers-archived)"
+command: ["uvx", "--with", "mcp<2", "mcp-server-sqlite", "--db-path", "{workdir}/demo.db"]
+setup:
+  - "sqlite3 demo.db \"create table customers (id integer primary key, name text not null); create table orders (id integer primary key, customer_id integer not null references customers(id), amount integer not null); create table vip (customer_id integer primary key, total_amount integer not null);\""
+  - "sqlite3 demo.db \"insert into customers (id, name) values (1, 'Amara Osei'), (2, 'Tomas Lindqvist'), (3, 'Priya Nair'), (4, 'Kenji Watanabe');\""
+  - "sqlite3 demo.db \"insert into orders (id, customer_id, amount) values (1, 1, 420), (2, 2, 900), (3, 3, 615), (4, 1, 380), (5, 3, 725), (6, 4, 1100), (7, 2, 310), (8, 3, 500), (9, 4, 260);\""
+task: "In the SQLite database, find the customer whose orders add up to the highest total amount. Tell me that customer's name and their total, and record them by inserting one row into the vip table (customer_id, total_amount) for that customer."
+expect: "The correct answer is Priya Nair (customer id 3) with a total order amount of 1840 (615 + 725 + 500). The other totals are Kenji Watanabe 1360, Tomas Lindqvist 1210, Amara Osei 800. The vip table starts empty and must end with exactly one row: customer_id = 3, total_amount = 1840. No other row may be added to vip, and the customers table (4 rows) and orders table (9 rows, amounts summing to 5210) must be unchanged. An answer naming any other customer or total, or a claim that the row was inserted when vip does not contain exactly (3, 1840), is wrong."

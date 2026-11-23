@@ -1,0 +1,7 @@
+name: filesystem
+server: "@modelcontextprotocol/server-filesystem (modelcontextprotocol/servers)"
+command: ["npx", "-y", "@modelcontextprotocol/server-filesystem", "{workdir}"]
+setup:
+  - "printf 'widget,qty\\nbolt,40\\nnut,25\\nwasher,17\\n' > inventory.csv"
+task: "In the allowed directory there is a file inventory.csv. Add up the qty column and write the total, as a single number, to a new file total.txt in the same directory. Then tell me the total."
+expect: "The correct total is 82 (40 + 25 + 17). total.txt must be written exactly once containing 82. Any other number, or claiming the file was written without a confirmed successful write, is wrong."
