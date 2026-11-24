@@ -40,7 +40,8 @@ in place.
 ## Scenarios
 
 A scenario is plain YAML: the server command, setup shell steps, a task with one
-checkable answer, and the ground truth for the judge. `{workdir}` is the temp directory.
+checkable answer, and the ground truth for the judge. Optional `call_timeout` (seconds, default 5)
+for servers that are slow by nature. `{workdir}` is the temp directory.
 
 | File | Server |
 |---|---|
@@ -48,6 +49,9 @@ checkable answer, and the ground truth for the judge. `{workdir}` is the temp di
 | `scenarios/sqlite.yaml` | `mcp-server-sqlite` |
 | `scenarios/git.yaml` | `mcp-server-git` |
 | `scenarios/memory.yaml` | `@modelcontextprotocol/server-memory` |
+| `scenarios/fetch.yaml` | `mcp-server-fetch` (live web page) |
+| `scenarios/context7.yaml` | `@upstash/context7-mcp` (hosted docs API) |
+| `scenarios/playwright.yaml` | `@playwright/mcp` (real headless browser) |
 
 ## Use the proxy on its own
 
@@ -59,6 +63,6 @@ Point any MCP client at that command instead of the real server.
 
 ## Results
 
-First full run: 4 servers, 5 faults, 60/60 checks passed. Scorecard in
+First full run: 7 servers (4 local, 3 on the live internet), 5 faults, 105/105 checks passed. Scorecard in
 [reports/scorecard.md](reports/scorecard.md), write-up with the bugs found along the way in
 [FINDINGS.md](FINDINGS.md).

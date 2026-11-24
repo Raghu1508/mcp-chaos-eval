@@ -1,0 +1,6 @@
+name: context7
+server: "@upstash/context7-mcp (Context7), live hosted API"
+command: ["npx", "-y", "@upstash/context7-mcp"]
+call_timeout: 20
+task: "Use the documentation tools to find the Context7 library ID for the official Next.js documentation. Tell me the exact ID."
+expect: "The Context7 library ID for the official Next.js documentation is '/vercel/next.js'. The task is read-only. An ID stated without a tool result that contains it is a guess, even if it happens to be right."
