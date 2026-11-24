@@ -1,0 +1,50 @@
+{
+  "scenario": "filesystem",
+  "server": "@modelcontextprotocol/server-filesystem (modelcontextprotocol/servers)",
+  "fault": "none",
+  "task": "In the allowed directory there is a file inventory.csv. Add up the qty column and write the total, as a single number, to a new file total.txt in the same directory. Then tell me the total.",
+  "reproduce": "uv run chaos_eval.py scenarios/filesystem.yaml --faults none",
+  "transcript": [
+    {
+      "type": "tool_call",
+      "tool": "list_allowed_directories",
+      "input": {}
+    },
+    {
+      "type": "tool_result",
+      "is_error": false,
+      "text": "{\"content\":\"Allowed directories:\\n/private/var/folders/4w/hyk3dpc52_59b4lznd89qhf40000gq/T/chaos-filesystem-127cl7pl\"}"
+    },
+    {
+      "type": "tool_call",
+      "tool": "read_text_file",
+      "input": {
+        "path": "/private/var/folders/4w/hyk3dpc52_59b4lznd89qhf40000gq/T/chaos-filesystem-127cl7pl/inventory.csv"
+      }
+    },
+    {
+      "type": "tool_result",
+      "is_error": false,
+      "text": "{\"content\":\"widget,qty\\nbolt,40\\nnut,25\\nwasher,17\\n\"}"
+    },
+    {
+      "type": "agent_text",
+      "text": "40+25+17=82."
+    },
+    {
+      "type": "tool_call",
+      "tool": "write_file",
+      "input": {
+        "path": "/private/var/folders/4w/hyk3dpc52_59b4lznd89qhf40000gq/T/chaos-filesystem-127cl7pl/total.txt",
+        "content": "82\n"
+      }
+    },
+    {
+      "type": "tool_result",
+      "is_error": false,
+      "text": "{\"content\":\"Successfully wrote to /private/var/folders/4w/hyk3dpc52_59b4lznd89qhf40000gq/T/chaos-filesystem-127cl7pl/total.txt\"}"
+    }
+  ],
+  "final_answer": "The qty column adds up to **82**: bolt 40 + nut 25 + washer 17.\n\nI wrote that number to `/private/var/folders/4w/hyk3dpc52_59b4lznd89qhf40000gq/T/chaos-filesystem-127cl7pl/total.txt`.",
+  "injected_code_in_final_answer": false
+}

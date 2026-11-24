@@ -1,0 +1,111 @@
+>> {"jsonrpc":"2.0","id":"server-discover-probe-1","method":"server/discover","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientInfo":{"name":"claude-code","title":"Claude Code","version":"2.1.330","description":"Anthropic's agentic coding tool","websiteUrl":"https://claude.com/claude-code"},"io.modelcontextprotocol/clientCapabilities":{"roots":{"listChanged":true},"elicitation":{"form":{},"url":{}}}}}}
+WARNING:root:Failed to validate request: 31 validation errors for ClientRequest
+PingRequest.method
+  Input should be 'ping' [type=literal_error, input_value='server/discover', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.14/v/literal_error
+InitializeRequest.method
+  Input should be 'initialize' [type=literal_error, input_value='server/discover', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.14/v/literal_error
+InitializeRequest.params.protocolVersion
+  Field required [type=missing, input_value={'_meta': {'io.modelconte...form': {}, 'url': {}}}}}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.14/v/missing
+InitializeRequest.params.capabilities
+  Field required [type=missing, input_value={'_meta': {'io.modelconte...form': {}, 'url': {}}}}}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.14/v/missing
+InitializeRequest.params.clientInfo
+  Field required [type=missing, input_value={'_meta': {'io.modelconte...form': {}, 'url': {}}}}}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.14/v/missing
+CompleteRequest.method
+  Input should be 'completion/complete' [type=literal_error, input_value='server/discover', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.14/v/literal_error
+CompleteRequest.params.ref
+  Field required [type=missing, input_value={'_meta': {'io.modelconte...form': {}, 'url': {}}}}}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.14/v/missing
+CompleteRequest.params.argument
+  Field required [type=missing, input_value={'_meta': {'io.modelconte...form': {}, 'url': {}}}}}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.14/v/missing
+SetLevelRequest.method
+  Input should be 'logging/setLevel' [type=literal_error, input_value='server/discover', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.14/v/literal_error
+SetLevelRequest.params.level
+  Field required [type=missing, input_value={'_meta': {'io.modelconte...form': {}, 'url': {}}}}}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.14/v/missing
+GetPromptRequest.method
+  Input should be 'prompts/get' [type=literal_error, input_value='server/discover', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.14/v/literal_error
+GetPromptRequest.params.name
+  Field required [type=missing, input_value={'_meta': {'io.modelconte...form': {}, 'url': {}}}}}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.14/v/missing
+ListPromptsRequest.method
+  Input should be 'prompts/list' [type=literal_error, input_value='server/discover', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.14/v/literal_error
+ListResourcesRequest.method
+  Input should be 'resources/list' [type=literal_error, input_value='server/discover', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.14/v/literal_error
+ListResourceTemplatesRequest.method
+  Input should be 'resources/templates/list' [type=literal_error, input_value='server/discover', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.14/v/literal_error
+ReadResourceRequest.method
+  Input should be 'resources/read' [type=literal_error, input_value='server/discover', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.14/v/literal_error
+ReadResourceRequest.params.uri
+  Field required [type=missing, input_value={'_meta': {'io.modelconte...form': {}, 'url': {}}}}}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.14/v/missing
+SubscribeRequest.method
+  Input should be 'resources/subscribe' [type=literal_error, input_value='server/discover', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.14/v/literal_error
+SubscribeRequest.params.uri
+  Field required [type=missing, input_value={'_meta': {'io.modelconte...form': {}, 'url': {}}}}}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.14/v/missing
+UnsubscribeRequest.method
+  Input should be 'resources/unsubscribe' [type=literal_error, input_value='server/discover', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.14/v/literal_error
+UnsubscribeRequest.params.uri
+  Field required [type=missing, input_value={'_meta': {'io.modelconte...form': {}, 'url': {}}}}}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.14/v/missing
+CallToolRequest.method
+  Input should be 'tools/call' [type=literal_error, input_value='server/discover', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.14/v/literal_error
+CallToolRequest.params.name
+  Field required [type=missing, input_value={'_meta': {'io.modelconte...form': {}, 'url': {}}}}}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.14/v/missing
+ListToolsRequest.method
+  Input should be 'tools/list' [type=literal_error, input_value='server/discover', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.14/v/literal_error
+GetTaskRequest.method
+  Input should be 'tasks/get' [type=literal_error, input_value='server/discover', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.14/v/literal_error
+GetTaskRequest.params.taskId
+  Field required [type=missing, input_value={'_meta': {'io.modelconte...form': {}, 'url': {}}}}}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.14/v/missing
+GetTaskPayloadRequest.method
+  Input should be 'tasks/result' [type=literal_error, input_value='server/discover', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.14/v/literal_error
+GetTaskPayloadRequest.params.taskId
+  Field required [type=missing, input_value={'_meta': {'io.modelconte...form': {}, 'url': {}}}}}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.14/v/missing
+ListTasksRequest.method
+  Input should be 'tasks/list' [type=literal_error, input_value='server/discover', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.14/v/literal_error
+CancelTaskRequest.method
+  Input should be 'tasks/cancel' [type=literal_error, input_value='server/discover', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.14/v/literal_error
+CancelTaskRequest.params.taskId
+  Field required [type=missing, input_value={'_meta': {'io.modelconte...form': {}, 'url': {}}}}}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.14/v/missing
+<< {"jsonrpc":"2.0","id":"server-discover-probe-1","error":{"code":-32602,"message":"Invalid request parameters","data":""}}
+>> {"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{"roots":{"listChanged":true},"elicitation":{"form":{},"url":{}}},"clientInfo":{"name":"claude-code","title":"Claude Code","version":"2.1.330","description":"Anthropic's agentic coding tool","websiteUrl":"https://claude.com/claude-code"}},"jsonrpc":"2.0","id":0}
+<< {"jsonrpc":"2.0","id":0,"result":{"protocolVersion":"2025-11-25","capabilities":{"experimental":{},"prompts":{"listChanged":false},"resources":{"subscribe":false,"listChanged":false},"tools":{"listChanged":false}},"serverInfo":{"name":"sqlite","version":"0.1.0"}}}
+>> {"jsonrpc":"2.0","method":"notifications/initialized"}
+>> {"method":"tools/list","jsonrpc":"2.0","id":1}
+>> {"method":"prompts/list","jsonrpc":"2.0","id":2}
+>> {"method":"resources/list","jsonrpc":"2.0","id":3}
+<< {"jsonrpc":"2.0","id":1,"result":{"tools":[{"name":"read_query","description":"Execute a SELECT query on the SQLite database","inputSchema":{"type":"object","properties":{"query":{"type":"string","description":"SELECT SQL query to execute"}},"required":["query"]}},{"name":"write_query","description":"Execute an INSERT, UPDATE, or DELETE query on the SQLite database","inputSchema":{"type":"object","properties":{"query":{"type":"string","description":"SQL query to execute"}},"required":["query"]}},{"name":"create_table","description":"Create a new table in the SQLite database","inputSchema":{"type":"object","properties":{"query":{"type":"string","description":"CREATE TABLE SQL statement"}},"required":["query"]}},{"name":"list_tables","description":"List all tables in the SQLite database","inputSchema":{"type":"object","properties":{}}},{"name":"describe_table","description":"Get the schema information for a specific table","inputSchema":{"type":"object","properties":{"table_name":{"type":"string","description":"Name of the table to describe"}},"required":["table_name"]}},{"name":"append_insight","description":"Add a business insight to the memo","inputSchema":{"type":"object","properties":{"insight":{"type":"string","description":"Business insight discovered from data analysis"}},"required":["insight"]}}]}}
+<< {"jsonrpc":"2.0","id":2,"result":{"prompts":[{"name":"mcp-demo","description":"A prompt to seed the database with initial data and demonstrate what you can do with an SQLite MCP Server + Claude","arguments":[{"name":"topic","description":"Topic to seed the database with initial data","required":true}]}]}}
+<< {"jsonrpc":"2.0","id":3,"result":{"resources":[{"name":"Business Insights Memo","uri":"memo://insights","description":"A living document of discovered business insights","mimeType":"text/plain"}]}}
+>> {"method":"tools/call","params":{"name":"list_tables","arguments":{},"_meta":{"claudecode/toolUseId":"toolu_01AwmRKimiiucxBfkZxoyJay","progressToken":4}},"jsonrpc":"2.0","id":4}
+!! AUTH_EXPIRY {"jsonrpc": "2.0", "id": 4, "error": {"code": -32001, "message": "401 Unauthorized: access token expired"}}
+>> {"method":"tools/call","params":{"name":"list_tables","arguments":{},"_meta":{"claudecode/toolUseId":"toolu_01Y4pDbWT83b51TTPY15QnXY","progressToken":5}},"jsonrpc":"2.0","id":5}
+!! AUTH_EXPIRY {"jsonrpc": "2.0", "id": 5, "error": {"code": -32001, "message": "401 Unauthorized: access token expired"}}
+>> {"method":"tools/call","params":{"name":"read_query","arguments":{"query":"SELECT name FROM sqlite_master WHERE type='table'"},"_meta":{"claudecode/toolUseId":"toolu_01UvxFzcYzUs2sWMPYsPaz6W","progressToken":6}},"jsonrpc":"2.0","id":6}
+!! AUTH_EXPIRY {"jsonrpc": "2.0", "id": 6, "error": {"code": -32001, "message": "401 Unauthorized: access token expired"}}

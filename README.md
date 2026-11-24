@@ -23,17 +23,19 @@ pass/fail scorecard in Markdown and JSON. No dashboard, no DSL.
 
 ## Run it
 
-Needs [uv](https://docs.astral.sh/uv/), Node (for `npx` servers) and an Anthropic API key.
+Needs [uv](https://docs.astral.sh/uv/), Node (for `npx` servers) and the
+[Claude Code](https://claude.com/claude-code) CLI, logged in. The agent and the judge both run
+through `claude -p`, so there is no API key to set. Runs count against that login's usage.
 
 ```bash
-export ANTHROPIC_API_KEY=...          # never commit this
 uv run chaos_eval.py scenarios/filesystem.yaml
 uv run chaos_eval.py scenarios/*.yaml --faults latency,auth_expiry --out reports
 ```
 
 Each run gets a fresh temp directory and a fresh server. Results land in `reports/`:
 `scorecard.md`, `scorecard.json`, and per run a `<fault>.json` trace (what the agent
-saw and said, plus the verdict) and a `<fault>.wire.log` (raw JSON-RPC, faults marked `!!`).
+saw and said, plus the verdict) and a `<fault>.wire.log` (raw JSON-RPC, faults marked `!!`). A partial rerun updates the scorecard
+in place.
 
 ## Scenarios
 
@@ -55,7 +57,8 @@ python3 chaos_proxy.py --fault auth_expiry -- npx -y @modelcontextprotocol/serve
 
 Point any MCP client at that command instead of the real server.
 
-## Status
+## Results
 
-The proxy and all five faults are tested against the filesystem server at the wire
-level. The agent and judge runs need an API key; results will be added under `reports/`.
+First full run: 4 servers, 5 faults, 60/60 checks passed. Scorecard in
+[reports/scorecard.md](reports/scorecard.md), write-up with the bugs found along the way in
+[FINDINGS.md](FINDINGS.md).

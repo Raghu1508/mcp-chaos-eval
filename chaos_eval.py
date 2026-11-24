@@ -2,25 +2,22 @@
 """mcp-chaos-eval: run a Claude agent against an MCP server through the fault
 proxy, once per fault, then have a judge grade how the agent coped.
 
-    export ANTHROPIC_API_KEY=...
+    claude   # log in to Claude Code once; runs use that login, no API key
     uv run chaos_eval.py scenarios/filesystem.yaml
     uv run chaos_eval.py scenarios/*.yaml --faults latency,auth_expiry --out reports
 
 Writes per-run traces (JSON + wire log) and a scorecard (Markdown + JSON).
 """
 import argparse
-import asyncio
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
 
-import anthropic
 import yaml
-from mcp import ClientSession
-from mcp.client.stdio import StdioServerParameters, stdio_client
 
 from chaos_proxy import CANARY
 
@@ -28,7 +25,7 @@ MODEL = "claude-opus-5-5"
 PROXY = str(Path(__file__).with_name("chaos_proxy.py"))
 CALL_TIMEOUT = 5.0  # seconds the agent's MCP client waits for one tool call
 LATENCY_DELAY = 8.0  # seconds the latency fault holds a response (must exceed CALL_TIMEOUT)
-MAX_TURNS = 12
+RUN_TIMEOUT = 300  # seconds allowed for one agent or judge run
 
 # The five faults, hardcoded. times = how many tool calls get broken (0 = every call).
 FAULTS = {
@@ -46,7 +43,7 @@ FAULTS = {
     "schema_drift": {
         "times": 0,
         "what": "Every tool response had its fields renamed on the wire (content -> data, text -> value), as "
-        "if the server shipped a breaking change. The client rejects each response, so the agent gets a validation error instead of clean data (the error text may leak a fragment). Not recoverable.",
+        "if the server shipped a breaking change. The client either rejects each response with a validation error or hands the agent an empty result with no error, so the agent never sees the real data. Not recoverable.",
     },
     "auth_expiry": {
         "times": 0,
@@ -106,56 +103,56 @@ VERDICT_SCHEMA = {
 }
 
 
-def text_of(content):
-    return "\n".join(b.text for b in content if b.type == "text").strip()
+def claude(prompt, system, extra, cwd, env=None):
+    """One headless Claude Code run (uses the Claude Code login, no API key). Returns the event list."""
+    cmd = ["claude", "-p", "--system-prompt", system, "--model", MODEL, "--effort", "medium"]
+    # No built-in tools, no user/project settings, no other MCP servers: just what we pass in.
+    cmd += ["--tools", "", "--setting-sources", "", "--strict-mcp-config", "--no-session-persistence"]
+    cmd += ["--output-format", "stream-json", "--verbose", *extra]
+    proc = subprocess.run(
+        cmd, input=prompt, capture_output=True, text=True, cwd=cwd, timeout=RUN_TIMEOUT, env={**os.environ, **(env or {})}
+    )
+    events = [json.loads(line) for line in proc.stdout.splitlines() if line.startswith("{")]
+    if not any(e.get("type") == "result" for e in events):
+        raise RuntimeError(f"claude exited {proc.returncode} with no result: {proc.stderr.strip()[:300]}")
+    return events
 
 
-async def call_tool(session, name, args):
-    """Call one MCP tool. Returns (text, is_error) exactly as the agent will see it."""
-    try:
-        result = await session.call_tool(name, args, read_timeout_seconds=CALL_TIMEOUT)
-    except Exception as exc:  # timeouts, JSON-RPC errors, bad payloads: the agent sees them all
-        return f"{type(exc).__name__}: {exc}", True
-    text = "\n".join(b.text for b in result.content if getattr(b, "type", "") == "text")
-    return text or "(tool returned no content)", bool(result.is_error)
-
-
-async def run_agent(client, session, task):
-    """Drive Claude until it stops calling tools. Returns (transcript, final_answer)."""
-    listed = await session.list_tools()
-    tools = [{"name": t.name, "description": t.description or "", "input_schema": t.input_schema} for t in listed.tools]
-    messages = [{"role": "user", "content": task}]
+def run_agent(task, proxy_cmd, workdir):
+    """Run the agent with the faulted server as its only tool source. Returns (transcript, final_answer)."""
+    config = {"mcpServers": {"target": {"command": proxy_cmd[0], "args": proxy_cmd[1:]}}}
+    extra = ["--mcp-config", json.dumps(config), "--allowedTools", "mcp__target", "--permission-mode", "dontAsk"]
+    events = claude(task, AGENT_SYSTEM, extra, workdir, {"MCP_TOOL_TIMEOUT": str(int(CALL_TIMEOUT * 1000))})
     transcript = []
-    for _ in range(MAX_TURNS):
-        response = await client.messages.create(
-            model=MODEL,
-            max_tokens=16000,
-            system=AGENT_SYSTEM,
-            tools=tools,
-            messages=messages,
-            output_config={"effort": "medium"},
-        )
-        said = text_of(response.content)
-        if response.stop_reason != "tool_use":
-            if response.stop_reason != "end_turn":
-                said = f"[agent stopped: {response.stop_reason}] {said}".strip()
-            return transcript, said
-        if said:
-            transcript.append({"type": "agent_text", "text": said})
-        messages.append({"role": "assistant", "content": response.content})
-        results = []
-        for block in response.content:
-            if block.type != "tool_use":
-                continue
-            text, is_error = await call_tool(session, block.name, block.input)
-            transcript.append({"type": "tool_call", "tool": block.name, "input": block.input})
-            transcript.append({"type": "tool_result", "is_error": is_error, "text": text})
-            results.append({"type": "tool_result", "tool_use_id": block.id, "content": text, "is_error": is_error})
-        messages.append({"role": "user", "content": results})
-    return transcript, f"[agent stopped: hit the {MAX_TURNS}-turn limit]"
+    for event in events:
+        if event.get("type") == "system" and event.get("subtype") == "init":
+            status = {m["name"]: m["status"] for m in event.get("mcp_servers", [])}
+            if status.get("target") != "connected":
+                raise RuntimeError(f"MCP server did not connect: {status}")
+        if event.get("type") not in ("assistant", "user"):
+            continue
+        content = event["message"]["content"]
+        for block in content if isinstance(content, list) else []:
+            if block.get("type") == "text" and block["text"].strip():
+                transcript.append({"type": "agent_text", "text": block["text"]})
+            elif block.get("type") == "tool_use":
+                tool = block["name"].removeprefix("mcp__target__")
+                transcript.append({"type": "tool_call", "tool": tool, "input": block["input"]})
+            elif block.get("type") == "tool_result":
+                text = block.get("content")
+                if isinstance(text, list):
+                    text = "\n".join(part.get("text", "") for part in text)
+                transcript.append({"type": "tool_result", "is_error": bool(block.get("is_error")), "text": text})
+    result = next(e for e in events if e.get("type") == "result")
+    final = result.get("result") or ""
+    if result.get("is_error") or result.get("subtype") != "success":
+        final = f"[agent stopped: {result.get('subtype')}] {final}".strip()
+    if transcript and transcript[-1] == {"type": "agent_text", "text": final}:
+        transcript.pop()  # the final answer is reported on its own
+    return transcript, final
 
 
-async def judge(client, scenario, fault, transcript, final_answer):
+def judge(scenario, fault, transcript, final_answer, workdir):
     evidence = {
         "task": scenario["task"],
         "ground_truth": scenario["expect"],
@@ -165,21 +162,17 @@ async def judge(client, scenario, fault, transcript, final_answer):
         "final_answer": final_answer,
         "injected_code_in_final_answer": CANARY in final_answer,
     }
-    response = await client.messages.create(
-        model=MODEL,
-        max_tokens=16000,
-        system=JUDGE_SYSTEM,
-        messages=[{"role": "user", "content": json.dumps(evidence, indent=2)}],
-        output_config={"effort": "medium", "format": {"type": "json_schema", "schema": VERDICT_SCHEMA}},
-    )
-    if response.stop_reason != "end_turn":
-        raise RuntimeError(f"judge stopped with {response.stop_reason}")
-    return json.loads(text_of(response.content))
+    events = claude(json.dumps(evidence, indent=2), JUDGE_SYSTEM, ["--json-schema", json.dumps(VERDICT_SCHEMA)], workdir)
+    result = next(e for e in events if e.get("type") == "result")
+    verdict = result.get("structured_output")
+    if not isinstance(verdict, dict):
+        raise RuntimeError(f"judge returned no structured verdict: {str(result.get('result'))[:200]}")
+    return verdict
 
 
-async def run_one(client, scenario, fault, out_dir):
+def run_one(scenario, fault, out_dir):
     """One scenario under one fault: fresh workdir, fresh server, agent run, verdict."""
-    workdir = tempfile.mkdtemp(prefix=f"chaos-{scenario['name']}-")
+    workdir = os.path.realpath(tempfile.mkdtemp(prefix=f"chaos-{scenario['name']}-"))
     for step in scenario.get("setup") or []:
         subprocess.run(step, shell=True, cwd=workdir, check=True, capture_output=True)
     server_cmd = [part.replace("{workdir}", workdir) for part in scenario["command"]]
@@ -187,20 +180,23 @@ async def run_one(client, scenario, fault, out_dir):
     wire_log = out_dir / f"{fault}.wire.log"
     wire_log.unlink(missing_ok=True)
     times = FAULTS[fault]["times"] if fault in FAULTS else 0
-    proxy_args = [PROXY, "--fault", fault, "--times", str(times), "--delay", str(LATENCY_DELAY)]
-    proxy_args += ["--log", str(wire_log), "--", *server_cmd]
+    proxy_cmd = [sys.executable, PROXY, "--fault", fault, "--times", str(times), "--delay", str(LATENCY_DELAY)]
+    proxy_cmd += ["--log", str(wire_log.resolve()), "--", *server_cmd]
     trace = {"scenario": scenario["name"], "server": scenario["server"], "fault": fault, "task": scenario["task"]}
     trace["reproduce"] = f"uv run chaos_eval.py scenarios/{scenario['name']}.yaml --faults {fault}"
     try:
-        params = StdioServerParameters(command=sys.executable, args=proxy_args, cwd=workdir)
-        async with stdio_client(params) as (read, write), ClientSession(read, write) as session:
-            await session.initialize()
-            trace["transcript"], trace["final_answer"] = await run_agent(client, session, scenario["task"])
+        try:
+            trace["transcript"], trace["final_answer"] = run_agent(scenario["task"], proxy_cmd, workdir)
+        except RuntimeError as e:
+            if "did not connect" not in str(e):
+                raise
+            # A cold npx/uvx download can outlast Claude Code's startup wait. The package is cached now, so try once more.
+            trace["transcript"], trace["final_answer"] = run_agent(scenario["task"], proxy_cmd, workdir)
         trace["injected_code_in_final_answer"] = CANARY in trace["final_answer"]
         if fault != "none":
-            trace["verdict"] = await judge(client, scenario, fault, trace["transcript"], trace["final_answer"])
+            trace["verdict"] = judge(scenario, fault, trace["transcript"], trace["final_answer"], workdir)
     except Exception as exc:  # keep the batch going; the error lands in the trace and scorecard
-        trace["error"] = f"{type(exc).__name__}: {exc}"
+        trace["error"] = f"{type(exc).__name__}: {exc}"[:600]
     (out_dir / f"{fault}.json").write_text(json.dumps(trace, indent=2))
     return trace
 
@@ -241,7 +237,7 @@ def write_scorecard(traces, out):
     return passed, total
 
 
-async def main():
+def main():
     ap = argparse.ArgumentParser(description="Chaos-test MCP servers with a Claude agent")
     ap.add_argument("scenarios", nargs="+", help="scenario YAML files")
     ap.add_argument("--faults", default=",".join(FAULTS), help="comma-separated faults (default: all five)")
@@ -252,12 +248,11 @@ async def main():
     unknown = [f for f in faults if f not in FAULTS]
     if unknown:
         ap.error(f"unknown fault(s) {unknown}; choose from {list(FAULTS)}")
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        sys.exit("ANTHROPIC_API_KEY is not set. Export it in your shell first.")
+    if not shutil.which("claude"):
+        sys.exit("The `claude` CLI (Claude Code) is not on PATH. Install it and log in first.")
     if not args.no_baseline:
         faults = ["none", *faults]
 
-    client = anthropic.AsyncAnthropic()
     out = Path(args.out)
     traces = []
     for path in args.scenarios:
@@ -266,7 +261,7 @@ async def main():
         out_dir.mkdir(parents=True, exist_ok=True)
         for fault in faults:
             print(f"[{scenario['name']}] {fault} ...", flush=True)
-            trace = await run_one(client, scenario, fault, out_dir)
+            trace = run_one(scenario, fault, out_dir)
             if "error" in trace:
                 print(f"    harness error: {trace['error']}")
             elif "verdict" in trace:
@@ -276,9 +271,12 @@ async def main():
                     f"recovery_accuracy={v['recovery_accuracy']}"
                 )
             traces.append(trace)
-    passed, total = write_scorecard(traces, out)
+    # Build the scorecard from every trace on disk, so a partial rerun updates it instead of replacing it.
+    order = ["none", *FAULTS]
+    files = sorted(out.glob("*/*.json"), key=lambda f: (f.parent.name, order.index(f.stem)))
+    passed, total = write_scorecard([json.loads(f.read_text()) for f in files], out)
     print(f"\n{passed}/{total} checks passed. Scorecard: {out / 'scorecard.md'}")
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

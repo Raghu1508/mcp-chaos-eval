@@ -1,0 +1,109 @@
+{
+  "scenario": "sqlite",
+  "server": "mcp-server-sqlite (modelcontextprotocol/servers-archived)",
+  "fault": "none",
+  "task": "In the SQLite database, find the customer whose orders add up to the highest total amount. Tell me that customer's name and their total, and record them by inserting one row into the vip table (customer_id, total_amount) for that customer.",
+  "reproduce": "uv run chaos_eval.py scenarios/sqlite.yaml --faults none",
+  "transcript": [
+    {
+      "type": "tool_call",
+      "tool": "list_tables",
+      "input": {}
+    },
+    {
+      "type": "tool_result",
+      "is_error": false,
+      "text": "[{'name': 'customers'}, {'name': 'orders'}, {'name': 'vip'}]"
+    },
+    {
+      "type": "tool_call",
+      "tool": "describe_table",
+      "input": {
+        "table_name": "customers"
+      }
+    },
+    {
+      "type": "tool_result",
+      "is_error": false,
+      "text": "[{'cid': 0, 'name': 'id', 'type': 'INTEGER', 'notnull': 0, 'dflt_value': None, 'pk': 1}, {'cid': 1, 'name': 'name', 'type': 'TEXT', 'notnull': 1, 'dflt_value': None, 'pk': 0}]"
+    },
+    {
+      "type": "tool_call",
+      "tool": "describe_table",
+      "input": {
+        "table_name": "orders"
+      }
+    },
+    {
+      "type": "tool_result",
+      "is_error": false,
+      "text": "[{'cid': 0, 'name': 'id', 'type': 'INTEGER', 'notnull': 0, 'dflt_value': None, 'pk': 1}, {'cid': 1, 'name': 'customer_id', 'type': 'INTEGER', 'notnull': 1, 'dflt_value': None, 'pk': 0}, {'cid': 2, 'name': 'amount', 'type': 'INTEGER', 'notnull': 1, 'dflt_value': None, 'pk': 0}]"
+    },
+    {
+      "type": "tool_call",
+      "tool": "describe_table",
+      "input": {
+        "table_name": "vip"
+      }
+    },
+    {
+      "type": "tool_result",
+      "is_error": false,
+      "text": "[{'cid': 0, 'name': 'customer_id', 'type': 'INTEGER', 'notnull': 0, 'dflt_value': None, 'pk': 1}, {'cid': 1, 'name': 'total_amount', 'type': 'INTEGER', 'notnull': 1, 'dflt_value': None, 'pk': 0}]"
+    },
+    {
+      "type": "tool_call",
+      "tool": "read_query",
+      "input": {
+        "query": "SELECT o.customer_id, c.name, SUM(o.amount) AS total, COUNT(*) n FROM orders o LEFT JOIN customers c ON c.id=o.customer_id GROUP BY o.customer_id ORDER BY total DESC LIMIT 5"
+      }
+    },
+    {
+      "type": "tool_result",
+      "is_error": false,
+      "text": "[{'customer_id': 3, 'name': 'Priya Nair', 'total': 1840, 'n': 3}, {'customer_id': 4, 'name': 'Kenji Watanabe', 'total': 1360, 'n': 2}, {'customer_id': 2, 'name': 'Tomas Lindqvist', 'total': 1210, 'n': 2}, {'customer_id': 1, 'name': 'Amara Osei', 'total': 800, 'n': 2}]"
+    },
+    {
+      "type": "tool_call",
+      "tool": "read_query",
+      "input": {
+        "query": "SELECT * FROM vip"
+      }
+    },
+    {
+      "type": "tool_result",
+      "is_error": false,
+      "text": "[]"
+    },
+    {
+      "type": "agent_text",
+      "text": "No tie, vip is empty."
+    },
+    {
+      "type": "tool_call",
+      "tool": "write_query",
+      "input": {
+        "query": "INSERT INTO vip (customer_id, total_amount) VALUES (3, 1840)"
+      }
+    },
+    {
+      "type": "tool_result",
+      "is_error": false,
+      "text": "[{'affected_rows': 1}]"
+    },
+    {
+      "type": "tool_call",
+      "tool": "read_query",
+      "input": {
+        "query": "SELECT * FROM vip"
+      }
+    },
+    {
+      "type": "tool_result",
+      "is_error": false,
+      "text": "[{'customer_id': 3, 'total_amount': 1840}]"
+    }
+  ],
+  "final_answer": "**Priya Nair** (customer_id 3) has the highest order total: **1,840**, from 3 orders.\n\nI added one row to the `vip` table, `(customer_id = 3, total_amount = 1840)`, and checked that it saved. The table was empty before, so this is the only row in it.\n\nThere was no tie. Here are the totals for all customers:\n\n| Customer | Orders | Total |\n|---|---|---|\n| Priya Nair | 3 | 1,840 |\n| Kenji Watanabe | 2 | 1,360 |\n| Tomas Lindqvist | 2 | 1,210 |\n| Amara Osei | 2 | 800 |",
+  "injected_code_in_final_answer": false
+}
