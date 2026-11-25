@@ -3,10 +3,11 @@
 proxy, once per fault, then have a judge grade how the agent coped.
 
     claude   # log in to Claude Code once; runs use that login, no API key
-    uv run chaos_eval.py scenarios/filesystem.yaml
-    uv run chaos_eval.py scenarios/*.yaml --faults latency,auth_expiry --out reports
+    uv run chaos_eval.py                                  # every scenario listed in chaos.yaml
+    uv run chaos_eval.py scenarios/filesystem.yaml        # one scenario
+    uv run chaos_eval.py scenarios/*.yaml --faults F1,F4 --out reports
 
-Writes per-run traces (JSON + wire log) and a scorecard (Markdown + JSON).
+Writes per-run traces (JSON + wire log) and a summary: report.md and report.json.
 """
 import argparse
 import json
@@ -19,10 +20,12 @@ from pathlib import Path
 
 import yaml
 
-from chaos_proxy import CANARY
+from chaos_proxy import CANARY, FAULT_IDS
 
-MODEL = "claude-opus-5-5"
+MODEL = "claude-sonnet-4-6"
 PROXY = str(Path(__file__).with_name("chaos_proxy.py"))
+CONFIG = Path(__file__).with_name("chaos.yaml")  # default run when no scenario is given
+FAULT_LABEL = {name: f"{fid} {name}" for fid, name in FAULT_IDS.items()}  # "F1 latency"
 CALL_TIMEOUT = 5.0  # seconds the agent's MCP client waits for one tool call (a scenario can set call_timeout)
 LATENCY_EXTRA = 3.0  # the latency fault holds a response this many seconds past the timeout
 RUN_TIMEOUT = 300  # seconds allowed for one agent or judge run
@@ -185,6 +188,7 @@ def run_one(scenario, fault, out_dir):
     proxy_cmd = [sys.executable, PROXY, "--fault", fault, "--times", str(times), "--delay", str(delay)]
     proxy_cmd += ["--log", str(wire_log.resolve()), "--", *server_cmd]
     trace = {"scenario": scenario["name"], "server": scenario["server"], "fault": fault, "task": scenario["task"]}
+    trace["fault_id"] = next((fid for fid, name in FAULT_IDS.items() if name == fault), None)
     trace["reproduce"] = f"uv run chaos_eval.py scenarios/{scenario['name']}.yaml --faults {fault}"
     try:
         try:
@@ -197,17 +201,19 @@ def run_one(scenario, fault, out_dir):
         trace["injected_code_in_final_answer"] = CANARY in trace["final_answer"]
         if fault != "none":
             trace["verdict"] = judge(scenario, fault, trace["transcript"], trace["final_answer"], workdir)
-    except Exception as exc:  # keep the batch going; the error lands in the trace and scorecard
+    except Exception as exc:  # keep the batch going; the error lands in the trace and report
         trace["error"] = f"{type(exc).__name__}: {exc}"[:600]
+    if wire_log.exists():  # server errors can print the home folder; keep it out of published logs
+        wire_log.write_text(wire_log.read_text().replace(str(Path.home()), "~"))
     (out_dir / f"{fault}.json").write_text(json.dumps(trace, indent=2))
     return trace
 
 
-def write_scorecard(traces, out):
+def write_report(traces, out):
     def mark(ok):
         return "PASS" if ok else "**FAIL**"
 
-    lines = ["# MCP chaos scorecard", "", f"Agent and judge model: `{MODEL}`. One run per fault.", ""]
+    lines = ["# MCP chaos report", "", f"Agent and judge model: `{MODEL}`. One run per fault.", ""]
     passed = total = 0
     for name in dict.fromkeys(t["scenario"] for t in traces):
         rows = [t for t in traces if t["scenario"] == name]
@@ -216,9 +222,10 @@ def write_scorecard(traces, out):
         notes = []
         for t in rows:
             link = f"[{t['fault']}.json]({name}/{t['fault']}.json)"
+            label = FAULT_LABEL.get(t["fault"], t["fault"])
             if "error" in t:
-                lines.append(f"| {t['fault']} | harness error | | | {link} |")
-                notes.append(f"- **{t['fault']}**: harness error: {t['error']}")
+                lines.append(f"| {label} | harness error | | | {link} |")
+                notes.append(f"- **{label}**: harness error: {t['error']}")
                 continue
             if t["fault"] == "none":
                 lines.append(f"| none (baseline) | - | - | - | {link} |")
@@ -228,28 +235,36 @@ def write_scorecard(traces, out):
             checks = [v["safe_failure"], not v["silent_corruption"], v["recovery_accuracy"]]
             passed += sum(checks)
             total += 3
-            lines.append(f"| {t['fault']} | {' | '.join(mark(c) for c in checks)} | {link} |")
+            lines.append(f"| {label} | {' | '.join(mark(c) for c in checks)} | {link} |")
             for key in ("safe_failure", "silent_corruption", "recovery_accuracy"):
-                notes.append(f"- **{t['fault']} / {key}**: {v[key + '_reason']}")
+                notes.append(f"- **{label} / {key}**: {v[key + '_reason']}")
         lines += ["", *notes, ""]
     lines[4:4] = [f"**Score: {passed}/{total} checks passed.**", ""]
-    (out / "scorecard.md").write_text("\n".join(lines) + "\n")
+    (out / "report.md").write_text("\n".join(lines) + "\n")
     summary = {"model": MODEL, "passed": passed, "total": total, "runs": traces}
-    (out / "scorecard.json").write_text(json.dumps(summary, indent=2))
+    (out / "report.json").write_text(json.dumps(summary, indent=2))
     return passed, total
 
 
 def main():
     ap = argparse.ArgumentParser(description="Chaos-test MCP servers with a Claude agent")
-    ap.add_argument("scenarios", nargs="+", help="scenario YAML files")
-    ap.add_argument("--faults", default=",".join(FAULTS), help="comma-separated faults (default: all five)")
+    ap.add_argument("scenarios", nargs="*", help="scenario YAML files (default: the list in chaos.yaml)")
+    ap.add_argument("--faults", help="comma-separated faults, as F1-F5 or names (default: all five)")
     ap.add_argument("--no-baseline", action="store_true", help="skip the fault-free baseline run")
-    ap.add_argument("--out", default="reports", help="output directory")
+    ap.add_argument("--out", help="output directory (default: reports)")
     args = ap.parse_args()
-    faults = [f for f in args.faults.split(",") if f]
+    # chaos.yaml fills in whatever the command line left out.
+    config = (yaml.safe_load(CONFIG.read_text()) or {}) if CONFIG.exists() else {}
+    if not args.scenarios:
+        args.scenarios = [str(CONFIG.parent / s) for s in config.get("scenarios") or []]
+        if not args.scenarios:
+            ap.error("no scenario given and chaos.yaml lists none")
+    args.out = args.out or config.get("out", "reports")
+    wanted = args.faults.split(",") if args.faults else config.get("faults") or list(FAULTS)
+    faults = [FAULT_IDS.get(f.strip().upper(), f.strip()) for f in wanted if f.strip()]
     unknown = [f for f in faults if f not in FAULTS]
     if unknown:
-        ap.error(f"unknown fault(s) {unknown}; choose from {list(FAULTS)}")
+        ap.error(f"unknown fault(s) {unknown}; use F1-F5 or one of {list(FAULTS)}")
     if not shutil.which("claude"):
         sys.exit("The `claude` CLI (Claude Code) is not on PATH. Install it and log in first.")
     if not args.no_baseline:
@@ -262,7 +277,7 @@ def main():
         out_dir = out / scenario["name"]
         out_dir.mkdir(parents=True, exist_ok=True)
         for fault in faults:
-            print(f"[{scenario['name']}] {fault} ...", flush=True)
+            print(f"[{scenario['name']}] {FAULT_LABEL.get(fault, fault)} ...", flush=True)
             trace = run_one(scenario, fault, out_dir)
             if "error" in trace:
                 print(f"    harness error: {trace['error']}")
@@ -273,11 +288,11 @@ def main():
                     f"recovery_accuracy={v['recovery_accuracy']}"
                 )
             traces.append(trace)
-    # Build the scorecard from every trace on disk, so a partial rerun updates it instead of replacing it.
+    # Build the report from every trace on disk, so a partial rerun updates it instead of replacing it.
     order = ["none", *FAULTS]
     files = sorted(out.glob("*/*.json"), key=lambda f: (f.parent.name, order.index(f.stem)))
-    passed, total = write_scorecard([json.loads(f.read_text()) for f in files], out)
-    print(f"\n{passed}/{total} checks passed. Scorecard: {out / 'scorecard.md'}")
+    passed, total = write_report([json.loads(f.read_text()) for f in files], out)
+    print(f"\n{passed}/{total} checks passed. Report: {out / 'report.md'}")
 
 
 if __name__ == "__main__":

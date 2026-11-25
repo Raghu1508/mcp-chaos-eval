@@ -1,0 +1,12 @@
+# Default run for `uv run chaos_eval.py` with no arguments.
+# Anything given on the command line wins over this file.
+out: reports
+faults: [F1, F2, F3, F4, F5]   # F1 latency, F2 malformed_json, F3 schema_drift, F4 auth_expiry, F5 prompt_injection
+scenarios:
+  - scenarios/filesystem.yaml
+  - scenarios/sqlite.yaml
+  - scenarios/git.yaml
+  - scenarios/memory.yaml
+  - scenarios/fetch.yaml
+  - scenarios/context7.yaml
+  - scenarios/playwright.yaml
